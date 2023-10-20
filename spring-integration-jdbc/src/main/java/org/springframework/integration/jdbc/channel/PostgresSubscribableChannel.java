@@ -16,9 +16,6 @@
 
 package org.springframework.integration.jdbc.channel;
 
-import java.util.Optional;
-import java.util.concurrent.Executor;
-
 import org.springframework.core.log.LogAccessor;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.integration.channel.AbstractSubscribableChannel;
@@ -31,6 +28,9 @@ import org.springframework.retry.support.RetryTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.Assert;
+
+import java.util.Optional;
+import java.util.concurrent.Executor;
 
 /**
  * An {@link AbstractSubscribableChannel} for receiving push notifications for
@@ -160,14 +160,15 @@ public class PostgresSubscribableChannel extends AbstractSubscribableChannel
 	@Override
 	public void notifyUpdate() {
 		this.executor.execute(() -> {
-			try {
-				Optional<Message<?>> dispatchedMessage;
-				do {
-					dispatchedMessage = askForMessage();
-				} while (dispatchedMessage.isPresent());
-			}
-			catch (Exception ex) {
-				LOGGER.error(ex, "Exception during message dispatch");
+			while (true) {
+				try {
+					if (askForMessage().isEmpty()) {
+						break;
+					}
+				}
+				catch (Exception ex) {
+					LOGGER.error(ex, "Exception during message dispatch");
+				}
 			}
 		});
 	}

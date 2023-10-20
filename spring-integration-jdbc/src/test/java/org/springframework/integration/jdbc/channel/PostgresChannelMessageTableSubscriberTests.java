@@ -233,6 +233,31 @@ public class PostgresChannelMessageTableSubscriberTests implements PostgresConta
 		assertThat(payloads).containsExactly("1");
 	}
 
+	@Test
+	void testPollLoopDiesOnNotifyInSubscribe() throws InterruptedException {
+		CountDownLatch latch = new CountDownLatch(2);
+		List<Object> payloads = new ArrayList<>();
+
+		messageStore.addMessageToGroup(groupId, new GenericMessage<>("error"));
+		messageStore.addMessageToGroup(groupId, new GenericMessage<>("1"));
+
+		postgresChannelMessageTableSubscriber.start();
+		postgresSubscribableChannel.subscribe(message -> {
+			try {
+				if ("error".equals(message.getPayload())) {
+					throw new RuntimeException("An error has occurred");
+				}
+				payloads.add(message.getPayload());
+			}
+			finally {
+				latch.countDown();
+			}
+		});
+
+		assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(payloads).containsExactly("1");
+	}
+
 	@Configuration
 	@EnableIntegration
 	public static class Config {
